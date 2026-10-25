@@ -33,6 +33,7 @@
   --ok:#5fd394; --ok-bg:#12301f; --warn:#f3b74f; --warn-bg:#35270b; --bad:#ff7a80; --bad-bg:#3a1517; --info-bg:#1b2643;
   color-scheme:dark}
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 :root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 body{margin:0;-webkit-text-size-adjust:100%;background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:16px;line-height:1.5}
 .wrap{max-width:560px;margin:0 auto;padding-block:20px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:20px}
@@ -413,8 +414,8 @@ async function startLive(){
   try{
     stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"},width:{ideal:1280},height:{ideal:720}},audio:false});
   }catch(e){setStatus(e.name==="NotAllowedError"?"Permesso fotocamera negato. Abilitalo nelle impostazioni del browser per questo sito.":"Non riesco ad accendere la fotocamera. Usa Scatta una foto.");return;}
-  const v=$("video"); v.srcObject=stream; await v.play().catch(()=>{});
   $("camView").hidden=false; $("camHint").textContent="Inquadra il codice nel riquadro";
+  const v=$("video"); v.srcObject=stream; await v.play().catch(()=>{});
   const tr=stream.getVideoTracks()[0], caps=tr.getCapabilities?tr.getCapabilities():{};
   $("torchBtn").hidden=!caps.torch;
   if(!detector && "BarcodeDetector" in window){try{const f=await BarcodeDetector.getSupportedFormats();if(f.includes("qr_code"))detector=new BarcodeDetector({formats:["qr_code"]});}catch(e){}}
