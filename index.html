@@ -159,11 +159,11 @@ details.settings code{font-family:var(--f-mono);font-size:13px;word-break:break-
     <ul id="hist"></ul>
   </section>
 
-  <p class="foot">L'analisi avviene sul telefono e il link non viene mai aperto da solo. Se attivi Safe Browsing, solo il link viene inviato a Google per il confronto. Un sito truffa creato da poche ore può non essere ancora segnalato. Nel dubbio, digita tu l'indirizzo del sito ufficiale.</p>
+  <p class="foot">Versione 1.2. L'analisi avviene sul telefono e il link non viene mai aperto da solo. Se attivi Safe Browsing, solo il link viene inviato a Google per il confronto. Un sito truffa creato da poche ore può non essere ancora segnalato. Nel dubbio, digita tu l'indirizzo del sito ufficiale.</p>
 </div>
 
 <div class="cam" id="camView" hidden role="dialog" aria-label="Inquadratura QR">
-  <video id="video" playsinline muted></video>
+  <video id="video" playsinline muted autoplay></video>
   <div class="frame" aria-hidden="true"></div>
   <button class="btn torch" type="button" id="torchBtn" hidden>Torcia</button>
   <div class="bar"><p class="hint" id="camHint">Inquadra il codice nel riquadro</p><button class="btn close" type="button" id="camClose">Chiudi</button></div>
@@ -415,7 +415,9 @@ async function startLive(){
     stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"},width:{ideal:1280},height:{ideal:720}},audio:false});
   }catch(e){setStatus(e.name==="NotAllowedError"?"Permesso fotocamera negato. Abilitalo nelle impostazioni del browser per questo sito.":"Non riesco ad accendere la fotocamera. Usa Scatta una foto.");return;}
   $("camView").hidden=false; $("camHint").textContent="Inquadra il codice nel riquadro";
-  const v=$("video"); v.srcObject=stream; await v.play().catch(()=>{});
+  const v=$("video"); v.srcObject=stream;
+  try{await v.play();}catch(e){$("camHint").textContent="Tocca lo schermo per avviare la fotocamera";v.onclick=()=>v.play().catch(()=>{});}
+  setTimeout(()=>{if(scanning&&!v.videoWidth)$("camHint").textContent="La fotocamera non manda immagini. Chiudi altre app che la usano e riprova.";},3000);
   const tr=stream.getVideoTracks()[0], caps=tr.getCapabilities?tr.getCapabilities():{};
   $("torchBtn").hidden=!caps.torch;
   if(!detector && "BarcodeDetector" in window){try{const f=await BarcodeDetector.getSupportedFormats();if(f.includes("qr_code"))detector=new BarcodeDetector({formats:["qr_code"]});}catch(e){}}
