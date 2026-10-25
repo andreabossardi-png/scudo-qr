@@ -124,6 +124,7 @@ details.settings code{font-family:var(--f-mono);font-size:13px;word-break:break-
     </label>
       <label class="btn btn-sec" for="gal">Scegli dalla galleria<input class="sr" type="file" id="gal" accept="image/*"></label>
     </div>
+    <button class="btn btn-sec" type="button" id="installBtn" hidden>Installa Scudo QR sul telefono</button>
     <form class="paste" id="pasteForm">
       <label class="sr" for="urlIn">Link da controllare</label>
       <input id="urlIn" type="text" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="oppure incolla un link">
@@ -159,7 +160,7 @@ details.settings code{font-family:var(--f-mono);font-size:13px;word-break:break-
     <ul id="hist"></ul>
   </section>
 
-  <p class="foot">Versione 1.2. L'analisi avviene sul telefono e il link non viene mai aperto da solo. Se attivi Safe Browsing, solo il link viene inviato a Google per il confronto. Un sito truffa creato da poche ore può non essere ancora segnalato. Nel dubbio, digita tu l'indirizzo del sito ufficiale.</p>
+  <p class="foot">Versione 1.3. L'analisi avviene sul telefono e il link non viene mai aperto da solo. Se attivi Safe Browsing, solo il link viene inviato a Google per il confronto. Un sito truffa creato da poche ore può non essere ancora segnalato. Nel dubbio, digita tu l'indirizzo del sito ufficiale.</p>
 </div>
 
 <div class="cam" id="camView" hidden role="dialog" aria-label="Inquadratura QR">
@@ -512,6 +513,10 @@ $("pasteForm").addEventListener("submit",e=>{
 drawHist();
 const ex=analyze("https://easypark-pagamenti.top/login?zona=TN04");
 render(ex,{example:true});
+let deferredPrompt=null;
+window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredPrompt=e;$("installBtn").hidden=false;});
+$("installBtn").onclick=async()=>{if(!deferredPrompt)return;deferredPrompt.prompt();try{await deferredPrompt.userChoice;}catch(e){}deferredPrompt=null;$("installBtn").hidden=true;};
+window.addEventListener("appinstalled",()=>{$("installBtn").hidden=true;setStatus("Installata: trovi Scudo QR tra le tue app.");});
 if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(()=>{});
 })();
 </script>
