@@ -80,6 +80,18 @@ h1{font-family:var(--f-display);font-stretch:78%;font-weight:800;font-size:30px;
 .btn-open{background:var(--fg);color:var(--bg)}
 .btn-open[aria-disabled="true"]{opacity:.35;pointer-events:none}
 .example{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0}
+details.report{border-top:1px solid var(--line);padding-top:14px}
+details.report summary{cursor:pointer;font-weight:700;font-size:16px}
+details.report .in{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+details.report .hint{font-size:14px;color:var(--muted);margin:0}
+details.report input[type=text]{font:inherit;font-size:15px;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--fg);width:100%}
+.btn-report{background:var(--bad-bg);color:var(--bad);border:1px solid transparent}
+.toast{font-size:14px;color:var(--ok);margin:0;min-height:1.4em}
+.mylist ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.mylist li{display:flex;gap:10px;align-items:center;justify-content:space-between;font-size:14px}
+.mylist li span{font-family:var(--f-mono);word-break:break-all;min-width:0}
+.mylist li small{display:block;font-family:var(--f-body);color:var(--muted)}
+.mylist button{font:inherit;font-size:13px;background:none;border:1px solid var(--line);color:var(--fg);border-radius:8px;padding:6px 10px;cursor:pointer;flex:none}
 .history h3{font-family:var(--f-display);font-stretch:80%;font-size:18px;text-transform:uppercase;letter-spacing:.03em;margin:0 0 8px}
 .history ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
 .history button{width:100%;text-align:left;font:inherit;font-size:14px;background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;display:grid;grid-template-columns:12px 1fr;gap:10px;align-items:center}
@@ -155,12 +167,20 @@ details.settings code{font-family:var(--f-mono);font-size:13px;word-break:break-
     </div>
   </details>
 
+  <details class="settings mylist" id="myBox" hidden>
+    <summary>Siti che hai segnato come truffa (<span id="myCount">0</span>)</summary>
+    <div class="in">
+      <p class="sbstate">Se inquadri di nuovo uno di questi siti, Scudo QR lo mostra subito in rosso. L'elenco resta solo su questo telefono.</p>
+      <ul id="myList"></ul>
+    </div>
+  </details>
+
   <section class="history" id="histBox" hidden>
     <h3>Ultimi controlli</h3>
     <ul id="hist"></ul>
   </section>
 
-  <p class="foot">Versione 1.3. L'analisi avviene sul telefono e il link non viene mai aperto da solo. Se attivi Safe Browsing, solo il link viene inviato a Google per il confronto. Un sito truffa creato da poche ore può non essere ancora segnalato. Nel dubbio, digita tu l'indirizzo del sito ufficiale.</p>
+  <p class="foot">Versione 1.4. L'analisi avviene sul telefono e il link non viene mai aperto da solo. Se attivi Safe Browsing, solo il link viene inviato a Google per il confronto. Un sito truffa creato da poche ore può non essere ancora segnalato. Nel dubbio, digita tu l'indirizzo del sito ufficiale.</p>
 </div>
 
 <div class="cam" id="camView" hidden role="dialog" aria-label="Inquadratura QR">
@@ -269,6 +289,8 @@ function analyzeUrl(raw){
   if(!off && LURE.test(host+u.pathname)) add("warn",20,"Contiene parole tipiche delle truffe (accesso, verifica, pagamento, multa...).");
   if((reg.match(/-/g)||[]).length>=2) add("warn",12,"Il nome ha molti trattini, comune nei siti creati per ingannare.");
   if(raw.length>180) add("info",5,"Il link è molto lungo: guarda bene il nome evidenziato.");
+  const mine=reported().find(x=>x.d===reg);
+  if(mine) add("bad",90,"Hai segnato tu questo sito come truffa il "+fmtDate(mine.t)+(mine.p?" ("+mine.p+")":"")+".");
   if(off && !F.some(f=>f.lvl==="bad")) add("ok",0,"Il dominio "+off+" è nell'elenco dei siti ufficiali.");
   return {kind:"url",raw:raw.trim(),host,reg,parts,official:!!off,https:u.protocol==="https:",href:u.href,findings:F};
 }
@@ -328,6 +350,9 @@ const PILL={bad:["p-bad","Rischio"],warn:["p-warn","Attenzione"],ok:["p-ok","Ok"
 
 /* ---------- Rendering ---------- */
 function render(r,{example=false,save=true,sb=true}={}){
+  const key=x=>x&&(x.src||x.raw);
+  if(!lastResult||key(lastResult)!==key(r)) repOpen=false;
+  lastResult=r;
   const v=verdictOf(r);
   const V=VERDICT[v];
   const okOfficial=r.kind==="url"&&r.official&&v==="ok";
@@ -353,8 +378,24 @@ function render(r,{example=false,save=true,sb=true}={}){
     if(gate) html+=`<label class="confirm" for="ack"><input type="checkbox" id="ack"><span>${v==="bad"?"Ho capito che questo link sembra una truffa e voglio aprirlo lo stesso.":"Conosco la provenienza di questo QR."}</span></label>`;
     html+=`<a class="btn btn-open" id="openBtn" href="${esc(r.href)}" target="_blank" rel="noopener noreferrer nofollow" ${gate?'aria-disabled="true" tabindex="-1"':""}>Apri ${esc(r.reg)}</a>`;
   }
-  html+=`</div></div></div>`;
+  html+=`</div>`;
+  const canReport=!example && ((r.kind==="url" && r.reg) || (r.kind==="data" && (r.lvl==="bad"||r.lvl==="warn")));
+  if(canReport){
+    const isUrl=r.kind==="url"&&r.reg, marked=isUrl&&reported().some(x=>x.d===r.reg);
+    html+=`<details class="report" id="repBox" ${v!=="ok"||repOpen?"open":""}><summary>Segnala questo QR</summary><div class="in">
+      <label for="place" class="label" style="margin:0">Dove l'hai trovato? (facoltativo)</label>
+      <input type="text" id="place" placeholder="es. parcometro di via Belenzani, Trento" value="${esc(placeDraft)}" autocomplete="off">
+      ${isUrl?`<button class="btn btn-report" type="button" id="markBtn">${marked?"Togli dalla mia lista truffe":"Segna come truffa su questo telefono"}</button>`:""}
+      ${isUrl?`<a class="btn btn-sec" id="repGoogle" href="https://safebrowsing.google.com/safebrowsing/report_phish/?hl=it&url=${encodeURIComponent(r.href)}" target="_blank" rel="noopener noreferrer">Segnala a Google</a>`:""}
+      <a class="btn btn-sec" id="repPolizia" href="https://www.commissariatodips.it/segnalazioni/segnala-online/index.html" target="_blank" rel="noopener noreferrer">Segnala alla Polizia Postale</a>
+      <button class="btn btn-sec" type="button" id="shareBtn">Avvisa amici e familiari</button>
+      <p class="hint">Google e Polizia Postale aprono il loro modulo. Prima di aprirlo, Scudo QR copia il testo della segnalazione: incollalo nella descrizione. Se il QR è un adesivo su un parcometro o un cartello, avvisa anche il Comune o il gestore.</p>
+      <p class="toast" id="repToast" role="status"></p>
+    </div></details>`;
+  }
+  html+=`</div></div>`;
   $("out").innerHTML=html;
+  if(canReport) wireReport(r,v);
   $("copyBtn").onclick=async()=>{
     const b=$("copyBtn");
     try{await navigator.clipboard.writeText(r.raw||r.kv.map(x=>x[1]).join("\n"));b.textContent="Copiato";}
@@ -366,6 +407,51 @@ function render(r,{example=false,save=true,sb=true}={}){
   if(save&&!example) remember(r,v);
   if(!example && sb!==false && r.kind==="url" && r.href) sbCheck(r);
 }
+
+/* ---------- Segnalazioni ---------- */
+const REPKEY="scudoqr-reported";
+let placeDraft="", repOpen=false, lastResult=null;
+function reported(){try{return JSON.parse(localStorage.getItem(REPKEY)||"[]");}catch(e){return [];}}
+function saveReported(a){try{localStorage.setItem(REPKEY,JSON.stringify(a));}catch(e){}drawMine();}
+function fmtDate(t){try{return new Date(t).toLocaleDateString("it-IT",{day:"numeric",month:"long",year:"numeric"});}catch(e){return "";}}
+const defang=d=>String(d).replace(/\./g,"[.]");
+function reportText(r,v){
+  const place=placeDraft.trim(), now=new Date().toLocaleString("it-IT",{dateStyle:"short",timeStyle:"short"});
+  const why=r.findings.filter(f=>f.lvl==="bad"||f.lvl==="warn").map(f=>"- "+f.t).join("\n");
+  const what=r.kind==="url"?"Link contenuto: "+r.raw:(r.type+": "+r.kv.filter(x=>x[1]).map(x=>x[0]+" "+x[1]).join(", "));
+  return "Segnalo un QR code sospetto, probabile truffa (quishing).\n"+what+"\n"+(place?"Trovato in: "+place+"\n":"")+"Data: "+now+"\n"+(why?"Elementi sospetti:\n"+why:"");
+}
+async function copyQuiet(t){try{await navigator.clipboard.writeText(t);return true;}catch(e){return false;}}
+function wireReport(r,v){
+  const toast=t=>{const el=$("repToast");if(el)el.textContent=t;};
+  $("repBox").addEventListener("toggle",e=>{repOpen=e.target.open;});
+  $("place").addEventListener("input",e=>{placeDraft=e.target.value;});
+  const mb=$("markBtn");
+  if(mb) mb.onclick=()=>{
+    const list=reported(), i=list.findIndex(x=>x.d===r.reg);
+    if(i>=0){list.splice(i,1);saveReported(list);}
+    else{list.unshift({d:r.reg,t:new Date().toISOString(),p:placeDraft.trim()});saveReported(list.slice(0,200));}
+    repOpen=true; const nr=analyze(r.src||r.raw); nr.src=r.src||r.raw; render(nr,{save:true,sb:false});
+    $("repToast").textContent=i>=0?"Tolto dalla tua lista.":"Segnato: d'ora in poi questo sito risulta rosso.";
+  };
+  const g=$("repGoogle");
+  if(g) g.addEventListener("click",()=>{copyQuiet(r.href).then(ok=>toast(ok?"Link copiato: se il modulo di Google non lo mostra già, incollalo.":""));});
+  $("repPolizia").addEventListener("click",()=>{copyQuiet(reportText(r,v)).then(ok=>toast(ok?"Testo della segnalazione copiato: incollalo nella descrizione del modulo.":"Copia non riuscita: usa Copia contenuto."));});
+  $("shareBtn").onclick=async()=>{
+    const place=placeDraft.trim();
+    const dest=r.kind==="url"?"porta al sito "+defang(r.reg)+", che non è ufficiale":"chiede un "+r.type.toLowerCase();
+    const text="Attenzione: ho trovato un QR code truffa"+(place?" ("+place+")":"")+". Inquadrandolo "+dest+". Non pagare e non inserire dati da quel QR. Usa solo l'app o il sito ufficiale.";
+    if(navigator.share){try{await navigator.share({title:"QR code truffa",text});return;}catch(e){if(e.name==="AbortError")return;}}
+    toast(await copyQuiet(text)?"Messaggio copiato: incollalo su WhatsApp o dove preferisci.":"Condivisione non disponibile su questo telefono.");
+  };
+}
+function drawMine(){
+  const a=reported(); $("myBox").hidden=!a.length; $("myCount").textContent=a.length;
+  $("myList").innerHTML=a.map((x,i)=>`<li><span>${esc(x.d)}<small>${esc(fmtDate(x.t))}${x.p?" · "+esc(x.p):""}</small></span><button type="button" data-i="${i}">Togli</button></li>`).join("");
+  $("myList").querySelectorAll("button").forEach(b=>b.onclick=()=>{const l=reported();l.splice(+b.dataset.i,1);saveReported(l);
+    if(lastResult&&lastResult.kind==="url"&&!$("out").querySelector(".example")){const nr=analyze(lastResult.src||lastResult.raw);nr.src=lastResult.src||lastResult.raw;render(nr,{save:false,sb:false});}});
+}
+drawMine();
 
 /* ---------- Google Safe Browsing ---------- */
 const SBKEY="scudoqr-sbkey";
